@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proj-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: proj-app
+  template:
+    metadata:
+      labels:
+        app: proj-app
+    spec:
+      containers:
+        - name: proj-app
+          image: proj-app:1.0.0
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/proj
+            - name: SPRING_DATASOURCE_USERNAME
+              value: root
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_ROOT_PASSWORD
+            - name: SPRING_DATA_REDIS_HOST
+              value: redis
+            - name: JAVA_TOOL_OPTIONS
+              value: >-
+                -XX:+UseG1GC
+                -XX:G1HeapRegionSize=4M
+                -XX:MaxGCPauseMillis=200
+                -XX:InitiatingHeapOccupancyPercent=45
+                -Xms512m
+                -Xmx1024m
+                -XX:+HeapDumpOnOutOfMemoryError
+                -XX:HeapDumpPath=/dumps/heap-dump.hprof
+                -XX:+UseStringDeduplication
+                -XX:+ParallelRefProcEnabled
+                -XX:+ExitOnOutOfMemoryError
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: heap-dumps
+              mountPath: /dumps
+      volumes:
+        - name: heap-dumps
+          emptyDir: {}
